@@ -1,0 +1,260 @@
+class Chatbox {
+    constructor() {
+        this.messages = []; // Stores the chat messages
+        this.index = -1; // Tracks the index for Prev button
+        this.bindElements();
+        this.stopWords = new Set([
+            "the", "in", "if", "what", "where", "when", "whether", "can", "be",
+            "how", "why", "and", "or", "is", "of", "to", "for", "on", "with"
+        ]); // Define stopwords
+    }
+
+    bindElements() {
+        this.inputField = document.querySelector(".chatbox__footer input");
+        this.sendButton = document.querySelector(".send__button");
+        this.prevButton = document.querySelector(".prev__button");
+        this.refreshButton = document.querySelector(".refresh__button");
+        this.chatLog = document.querySelector(".chatbox__messages");
+
+        this.sendButton.addEventListener("click", () => this.sendMessage());
+        this.prevButton.addEventListener("click", () => this.showPrevMessage());
+        this.refreshButton.addEventListener("click", () => this.clearChat());
+        this.inputField.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+                this.sendMessage();
+            }
+        });
+    }
+
+    async sendMessage() {
+        const userInput = this.inputField.value.trim();
+        if (!userInput) return;
+    
+        // Add user message to chat log
+        this.addMessage("You", userInput);
+        this.inputField.value = ""; // Clear input field
+    
+        // Add typing indicator
+        const typingIndicator = document.createElement("div");
+        typingIndicator.innerText = "Processing...";
+        typingIndicator.id = "typing-indicator";
+        typingIndicator.classList.add("typing-indicator");
+        this.chatLog.appendChild(typingIndicator);
+    
+        try {
+            const response = await fetch("http://127.0.0.1:5000/query", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query: userInput }),
+            });
+    
+            const data = await response.json();
+            document.getElementById("typing-indicator")?.remove(); // Remove typing indicator
+    
+            if (data.error) {
+                this.addMessage("System", data.error);
+            } else if (data.sources) {
+                // Display source buttons and contents
+                data.sources.forEach((sourceData) => {
+                    const sourceButton = document.createElement("button");
+                    sourceButton.classList.add("source-button");
+                    sourceButton.innerText = sourceData.source;
+                    sourceButton.addEventListener("click", () => this.showSourceContents(sourceData, userInput));
+    
+                    const messageElement = document.createElement("div");
+                    messageElement.appendChild(sourceButton);
+                    this.chatLog.appendChild(messageElement);
+                });
+    
+                // Optionally, update the history if needed
+                this.messages.push(userInput);
+                this.index = this.messages.length - 1;
+            } else {
+                this.addMessage("System", "No sources received from the server.");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            document.getElementById("typing-indicator")?.remove();
+            this.addMessage("System", "Error connecting to the server.");
+        } finally {
+            this.inputField.focus();
+        }
+    }
+
+
+    highlightKeywords(query, text) {
+        // Extract main words from the query and convert them to lowercase
+        const queryWords = query.toLowerCase().split(/\s+/);
+        
+        // Filter out stop words, ensuring case-insensitive matching
+        const keywords = queryWords.filter(word => !this.stopWords.has(word.toLowerCase()));
+    
+        // If there are no keywords after filtering, return the text without modifications
+        if (keywords.length === 0) return text;
+    
+        // Highlight keywords in the text
+        const escapedKeywords = keywords.map(word => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")); // Escape special regex chars
+        const pattern = new RegExp(`\\b(${escapedKeywords.join("|")})\\b`, "gi");
+    
+        return text.replace(pattern, "<mark>$1</mark>");
+    }
+
+    showSourceContents(sourceData, userInput) {
+        if (sourceData.contentsShown) return;
+    
+        const contentContainer = document.createElement("div");
+        contentContainer.classList.add("source-content-container");
+    
+        const extractedContents = []; // Collect all extracted content for download
+    
+        sourceData.contents.forEach((contentData, index) => {
+            const contentDiv = document.createElement("div");
+            contentDiv.classList.add("source-content");
+    
+            // Highlight keywords in the content
+            const highlightedContent = this.highlightKeywords(userInput, contentData.content);
+            contentDiv.innerHTML = `<strong>${sourceData.source} - Content #${contentData.index}:</strong> <p>${highlightedContent}</p>`;
+            
+            contentContainer.appendChild(contentDiv);
+    
+            // Collect content for extracted download
+            extractedContents.push(`Content #${contentData.index}:\n${contentData.content}`);
+        });
+    
+        const sourceButtonContainer = document.createElement("div");
+        sourceButtonContainer.classList.add("source-button-container");
+    
+        const sourceButton = document.createElement("button");
+        sourceButton.classList.add("source-button-1");
+        sourceButton.innerText = sourceData.source;
+        sourceButton.disabled = true;
+        sourceButtonContainer.appendChild(sourceButton);
+    
+        if (!sourceData.downloadButtonsCreated) {
+            // First button: Download extracted contents
+            const extractedDownloadButton = document.createElement("button");
+            extractedDownloadButton.classList.add("download-button-1");
+            extractedDownloadButton.title = "Download the extracted contents only";
+    
+            const downloadIcon1 = document.createElement("img");
+            downloadIcon1.src = "/static/images/download-icon-2.png";
+            downloadIcon1.alt = "Download Extracted";
+            downloadIcon1.style.width = "18px";
+            downloadIcon1.style.height = "18px";
+    
+            extractedDownloadButton.appendChild(downloadIcon1);
+            extractedDownloadButton.addEventListener("click", () => this.downloadExtractedContents(extractedContents));
+            sourceButtonContainer.appendChild(extractedDownloadButton);
+    
+            // Second button: Download whole source
+            const downloadButton = document.createElement("button");
+            downloadButton.classList.add("download-button");
+            downloadButton.title = "Download the whole source file";
+    
+            const downloadIcon2 = document.createElement("img");
+            downloadIcon2.src = "/static/images/download-icon.png";
+            downloadIcon2.alt = "Download Source";
+            downloadIcon2.style.width = "18px";
+            downloadIcon2.style.height = "18px";
+    
+            downloadButton.appendChild(downloadIcon2);
+            downloadButton.addEventListener("click", () => this.downloadFile(sourceData));
+            sourceButtonContainer.appendChild(downloadButton);
+    
+            sourceData.downloadButtonsCreated = true;
+        }
+
+        // If there's more info available, add the "More Info" button
+        if (sourceData.hasMoreInfo) {
+            const moreInfoButton = document.createElement("button");
+            moreInfoButton.classList.add("more-info-button");
+            moreInfoButton.innerText = "Show More Info";
+            moreInfoButton.addEventListener("click", () => this.showMoreInfo(sourceData));
+            sourceButtonContainer.appendChild(moreInfoButton);
+        }
+    
+        this.chatLog.appendChild(contentContainer);
+        this.chatLog.appendChild(sourceButtonContainer);
+        sourceData.contentsShown = true;
+    }
+
+    showMoreInfo(sourceData) {
+        const moreInfoContainer = document.createElement("div");
+        moreInfoContainer.classList.add("more-info-container");
+
+        sourceData.moreInfoContent.forEach((contentData) => {
+            const contentDiv = document.createElement("div");
+            contentDiv.classList.add("source-content");
+            contentDiv.innerHTML = `<strong>More info from ${sourceData.source}:</strong> <p>${contentData}</p>`;
+            moreInfoContainer.appendChild(contentDiv);
+        });
+
+        this.chatLog.appendChild(moreInfoContainer);
+    }
+
+    downloadExtractedContents(contents) {
+        const blob = new Blob([contents.join("\n\n")], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "extracted_contents.txt";
+        link.click();
+        URL.revokeObjectURL(url); // Free up memory
+    }
+
+    downloadFile(sourceData) {
+        fetch("http://127.0.0.1:5000/vectorestore/index_metadata.json")
+            .then(response => response.json())
+            .then(metadata => {
+                const filePath = sourceData.source.replace(/\\/g, "\\\\");
+                const normalizedMetadata = {};
+                Object.keys(metadata).forEach(key => {
+                    normalizedMetadata[key.replace(/\\/g, "\\")] = metadata[key];
+                });
+
+                const fileUrl = `http://127.0.0.1:5000/documents/${encodeURIComponent(filePath)}`;
+                const link = document.createElement("a");
+                link.href = fileUrl;
+                link.download = filePath.split("/").pop();
+                link.click();
+            })
+            .catch(error => {
+                console.error("Error fetching metadata:", error);
+            });
+    }
+
+    showPrevMessage() {
+        if (this.messages.length === 0 || this.index < 0) return;
+
+        const prevMessage = this.messages[this.index];
+        this.addMessage("System", `History: ${prevMessage}`);
+        this.index = Math.max(0, this.index - 1);
+    }
+
+    clearChat() {
+        this.chatLog.innerHTML = ""; // Clear chat log
+        this.messages = []; // Reset history
+        this.index = -1; // Reset index
+        this.addMessage("System", "Chat has been refreshed.");
+    }
+
+    addMessage(sender, message) {
+        const messageElement = document.createElement("div");
+        messageElement.classList.add("chatbox__message");
+        if (sender === "You") messageElement.classList.add("user-message");
+        else messageElement.classList.add("ai-message");
+
+        messageElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
+        this.chatLog.appendChild(messageElement);
+        this.scrollToBottom(); // Auto-scroll to bottom
+    }
+
+    scrollToBottom() {
+        this.chatLog.scrollTop = this.chatLog.scrollHeight;
+    }
+}
+
+// Initialize Chatbox
+document.addEventListener("DOMContentLoaded", () => {
+    new Chatbox();
+});

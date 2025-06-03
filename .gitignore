@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.log
+*.env
+.env
+*.DS_Store
+
+# FAISS and vectorstore data
+vectorstore/index.faiss
+vectorstore/index.pkl
+vectorstore/index_metadata.json
+
+# IDEs
+.vscode/
+.idea/
+
+# Flask cache
+instance/
+*.db
+*.sqlite3
+
+# System files
+Thumbs.db
+.DS_Store
+
+# PyCharm
+*.iml
+
+# Virtual environment
+venv/
+env/

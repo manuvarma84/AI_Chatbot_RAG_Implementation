@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="chat.css">
+    <title>Chat Support</title>
+</head>
+<body>
+    <div class="chatbox">
+        <div class="chatbox__support">
+            <div class="chatbox__header">
+                Chat Support!
+            </div>
+            <div class="chatbox__messages" id="chat-log">
+                <!-- Dynamic messages will appear here -->
+                <div id="typing-indicator-placeholder"></div>
+            </div>
+            <button class="scroll-down-btn" id="scroll-down-btn" title="Scroll Down">↓</button>
+            <div class="chatbox__footer">
+                <input type="text" id="user-input" placeholder="Write a message">
+                <button id="send-button" class="send__button">Send</button>
+                <button id="prev-button" class="prev__button">Prev</button>
+                <button id="clear-button" class="refresh__button">Clear Chat</button>
+            </div>
+        </div>
+        <div class="chatbox__button">
+            <button>Branch-1</button>
+        </div>
+    </div>
+    
+    <script src="./Chat.js"></script>
+    <script src="./app.js"></script>
+</body>
+</html>

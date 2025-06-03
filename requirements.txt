@@ -1,0 +1,10 @@
+flask
+langchain
+transformers
+sentence-transformers
+spacy
+textblob
+faiss-cpu
+python-docx
+python-Levenshtein
+numpy
