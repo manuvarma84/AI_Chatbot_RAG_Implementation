@@ -58,6 +58,8 @@ This will create the FAISS vectorstore and update the metadata.
 4. Start the Flask server
 python rag_hf_distilbart_only_query_server.py
 
+5. Provide your <<Logo.ico>> in images directory and provide the same name inside base.html
+
 The server runs at: http://127.0.0.1:5000
 
 
